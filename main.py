@@ -12,7 +12,7 @@ from room_calculator.report_generator import ReportGenerator
 
 
 class NumericField(QWidget):
-    """Поле ввода с меткой ошибки снизу (живая проверка)."""
+    """Поле ввода с меткой ошибки снизу."""
 
     def __init__(self, label_text, parent=None):
         super().__init__(parent)
