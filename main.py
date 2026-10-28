@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTreeWidget, QTreeWidgetItem,
     QDialog, QDialogButtonBox, QComboBox, QRadioButton, QButtonGroup,
-    QMessageBox, QFormLayout, QGroupBox, QInputDialog
+    QMessageBox, QInputDialog, QGroupBox
 )
 
 from room_calculator.models import Room, Apartment, Building
@@ -12,8 +12,6 @@ from room_calculator.report_generator import ReportGenerator
 
 
 class NumericField(QWidget):
-    """Поле ввода с меткой ошибки снизу."""
-
     def __init__(self, label_text, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -21,18 +19,15 @@ class NumericField(QWidget):
         layout.setSpacing(2)
 
         layout.addWidget(QLabel(label_text))
-
         self.entry = QLineEdit()
         self.entry.setPlaceholderText("Например: 3.5")
         layout.addWidget(self.entry)
 
-        # Красная метка для ошибки (по умолчанию невидима)
         self.error_label = QLabel("")
         self.error_label.setStyleSheet("color: red; font-size: 10px;")
         self.error_label.setVisible(False)
         layout.addWidget(self.error_label)
 
-        # Сигнал на изменение текста
         self.entry.textChanged.connect(self._validate)
 
     def _validate(self):
@@ -53,8 +48,6 @@ class NumericField(QWidget):
 
     def is_valid(self):
         text = self.entry.text().strip()
-        if not text:
-            return False
         try:
             return float(text) > 0
         except ValueError:
@@ -65,100 +58,94 @@ class NumericField(QWidget):
 
 
 class RoomDialog(QDialog):
-    """Диалог добавления комнаты."""
-
     def __init__(self, building: Building, parent=None):
         super().__init__(parent)
         self.building = building
         self.setWindowTitle("Добавление комнаты")
         self.setMinimumWidth(400)
-
         layout = QVBoxLayout(self)
 
-        # Квартира
         layout.addWidget(QLabel("Квартира:"))
         self.apt_combo = QComboBox()
         self.apt_combo.addItems([apt.name for apt in building.apartments])
         layout.addWidget(self.apt_combo)
 
-        # Название комнаты
         layout.addWidget(QLabel("Название комнаты:"))
         self.name_entry = QLineEdit()
         self.name_entry.setPlaceholderText("Например: Спальня")
         layout.addWidget(self.name_entry)
 
-        # Числовые поля с валидацией
         self.length_field = NumericField("Длина (м):")
         layout.addWidget(self.length_field)
-
         self.width_field = NumericField("Ширина (м):")
         layout.addWidget(self.width_field)
-
         self.height_field = NumericField("Высота (м):")
         layout.addWidget(self.height_field)
 
-        # Утепление
         layout.addWidget(QLabel("Уровень утепления:"))
-        insulation_layout = QHBoxLayout()
-        self.insulation_group = QButtonGroup(self)
+        ins_layout = QHBoxLayout()
+        self.ins_group = QButtonGroup(self)
         self.rb_low = QRadioButton("Низкий")
-        self.rb_medium = QRadioButton("Средний")
+        self.rb_med = QRadioButton("Средний")
         self.rb_high = QRadioButton("Высокий")
-        self.rb_medium.setChecked(True)
-        self.insulation_group.addButton(self.rb_low)
-        self.insulation_group.addButton(self.rb_medium)
-        self.insulation_group.addButton(self.rb_high)
-        insulation_layout.addWidget(self.rb_low)
-        insulation_layout.addWidget(self.rb_medium)
-        insulation_layout.addWidget(self.rb_high)
-        layout.addLayout(insulation_layout)
+        self.rb_med.setChecked(True)
+        self.ins_group.addButton(self.rb_low)
+        self.ins_group.addButton(self.rb_med)
+        self.ins_group.addButton(self.rb_high)
+        ins_layout.addWidget(self.rb_low)
+        ins_layout.addWidget(self.rb_med)
+        ins_layout.addWidget(self.rb_high)
+        layout.addLayout(ins_layout)
 
-        # Кнопки
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.button(QDialogButtonBox.Ok).setText("Добавить")
-        button_box.button(QDialogButtonBox.Cancel).setText("Отмена")
-        button_box.accepted.connect(self._on_add)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
+        btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btn_box.button(QDialogButtonBox.Ok).setText("Добавить")
+        btn_box.button(QDialogButtonBox.Cancel).setText("Отмена")
+        btn_box.accepted.connect(self._on_add)
+        btn_box.rejected.connect(self.reject)
+        layout.addWidget(btn_box)
 
     def _on_add(self):
-        apt_name = self.apt_combo.currentText()
-        room_name = self.name_entry.text().strip()
-
-        if not room_name:
-            QMessageBox.warning(self, "Ошибка ввода", "Введите название комнаты.")
+        if not self.name_entry.text().strip():
+            QMessageBox.warning(self, "Ошибка", "Введите название комнаты.")
             return
 
-        if not (self.length_field.is_valid() and
-                self.width_field.is_valid() and
-                self.height_field.is_valid()):
-            QMessageBox.warning(self, "Ошибка ввода",
-                                "Проверьте правильность заполнения размеров.")
+        if not (self.length_field.is_valid()
+                and self.width_field.is_valid()
+                and self.height_field.is_valid()):
+            QMessageBox.warning(self, "Ошибка", "Проверьте правильность размеров.")
             return
 
-        # Определяем утепление
         if self.rb_low.isChecked():
-            insulation = "low"
+            ins = "low"
         elif self.rb_high.isChecked():
-            insulation = "high"
+            ins = "high"
         else:
-            insulation = "medium"
+            ins = "medium"
 
+        # ВАЖНО: эта строка должна быть без лишних отступов (не внутри else)
         room = Room(
-            room_name,
+            self.name_entry.text().strip(),
             self.length_field.value(),
             self.width_field.value(),
             self.height_field.value(),
-            insulation
+            ins
         )
 
-        # Добавляем в нужную квартиру
+        apt_name = self.apt_combo.currentText()
         for apt in self.building.apartments:
             if apt.name == apt_name:
+                # Проверка на дубликат комнаты в этой квартире
+                for existing_room in apt.rooms:
+                    if existing_room.name == room.name:
+                        QMessageBox.warning(self, "Ошибка", f"Комната с названием '{room.name}' уже существует в этой квартире!")
+                        return
+                
                 apt.add_room(room)
                 break
 
         self.accept()
+
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -166,31 +153,33 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Калькулятор помещений (MVP)")
         self.resize(950, 650)
 
-        self.building = None  # модель данных
+        self.building = None
 
         central = QWidget()
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
 
-        # Панель здания
-        building_box = QGroupBox("Здание")
-        building_layout = QHBoxLayout(building_box)
+        # --- Панель здания ---
+        bld_box = QGroupBox("Здание")
+        bld_layout = QHBoxLayout(bld_box)
         self.building_label = QLabel("Название здания: (не задано)")
-        building_layout.addWidget(self.building_label)
-        building_layout.addStretch()
+        bld_layout.addWidget(self.building_label)
+        bld_layout.addStretch()
+
         btn_rename = QPushButton("Изменить название")
         btn_rename.clicked.connect(self._ask_building_name)
-        building_layout.addWidget(btn_rename)
-        layout.addWidget(building_box)
+        bld_layout.addWidget(btn_rename)
+        layout.addWidget(bld_box)
 
-        # Дерево структуры
+        # --- Дерево структуры ---
         tree_box = QGroupBox("Структура: Квартиры и Комнаты")
         tree_layout = QVBoxLayout(tree_box)
         self.tree = QTreeWidget()
         self.tree.setColumnCount(5)
-        self.tree.setHeaderLabels(
-            ["Уровень", "Название", "Площадь, кв.м", "Тепловая мощность, кВт", "Доп. параметры"]
-        )
+        self.tree.setHeaderLabels([
+            "Уровень", "Название", "Площадь, кв.м",
+            "Тепловая мощность, кВт", "Доп. параметры"
+        ])
         self.tree.setColumnWidth(0, 100)
         self.tree.setColumnWidth(1, 180)
         self.tree.setColumnWidth(2, 120)
@@ -199,7 +188,7 @@ class MainWindow(QMainWindow):
         tree_layout.addWidget(self.tree)
         layout.addWidget(tree_box)
 
-        # Кнопки управления
+        # --- Панель кнопок ---
         btn_layout = QHBoxLayout()
 
         btn_add_apt = QPushButton(" Добавить квартиру")
@@ -208,13 +197,18 @@ class MainWindow(QMainWindow):
         btn_add_room = QPushButton(" Добавить комнату")
         btn_add_room.clicked.connect(self._add_room)
 
-        btn_delete = QPushButton(" Удалить выбранное")
+        btn_delete = QPushButton("Удалить выбранное")
         btn_delete.clicked.connect(self._delete_selected)
 
-        btn_refresh = QPushButton(" Обновить расчёт")
+        btn_refresh = QPushButton("Обновить расчёт")
         btn_refresh.clicked.connect(self._refresh_tree)
 
-        btn_save = QPushButton(" Сохранить отчёт в Word")
+        # === КНОПКА СПРАВКИ ===
+        btn_help = QPushButton("Справка")
+        btn_help.setToolTip("Открыть руководство пользователя")
+        btn_help.clicked.connect(self._show_help)
+
+        btn_save = QPushButton("Сохранить отчёт в Word")
         btn_save.clicked.connect(self._save_report)
 
         btn_layout.addWidget(btn_add_apt)
@@ -222,10 +216,11 @@ class MainWindow(QMainWindow):
         btn_layout.addWidget(btn_delete)
         btn_layout.addWidget(btn_refresh)
         btn_layout.addStretch()
+        btn_layout.addWidget(btn_help)   # Справка перед сохранением
         btn_layout.addWidget(btn_save)
         layout.addLayout(btn_layout)
 
-        # Итоги
+        # --- Итоги ---
         result_box = QGroupBox("Итоги по зданию")
         result_layout = QVBoxLayout(result_box)
         self.result_label = QLabel("Нет данных")
@@ -233,10 +228,10 @@ class MainWindow(QMainWindow):
         result_layout.addWidget(self.result_label)
         layout.addWidget(result_box)
 
-        # Спрашиваем название здания при старте
+        # Запрос названия при старте
         self._ask_building_name()
 
-    # Логика
+    # ---------- Логика ----------
     def _ask_building_name(self):
         name, ok = QInputDialog.getText(
             self, "Название здания", "Введите название здания:",
@@ -254,9 +249,18 @@ class MainWindow(QMainWindow):
         if not self.building:
             QMessageBox.warning(self, "Внимание", "Сначала задайте название здания.")
             return
+            
         name, ok = QInputDialog.getText(self, "Новая квартира", "Название/номер квартиры:")
         if ok and name.strip():
-            self.building.add_apartment(Apartment(name.strip()))
+            name_clean = name.strip()
+                
+            # Проверка на дубликат
+            for apt in self.building.apartments:
+                if apt.name == name_clean:
+                    QMessageBox.warning(self, "Ошибка", f"Квартира с названием '{name_clean}' уже существует!")
+                    return
+                
+            self.building.add_apartment(Apartment(name_clean))
             self._refresh_tree()
 
     def _add_room(self):
@@ -274,10 +278,11 @@ class MainWindow(QMainWindow):
             return
 
         item_type = item.text(0)
-
         if item_type == "Квартира":
             apt_name = item.text(1)
-            self.building.apartments = [a for a in self.building.apartments if a.name != apt_name]
+            self.building.apartments = [
+                a for a in self.building.apartments if a.name != apt_name
+            ]
         elif item_type == "Комната":
             parent = item.parent()
             if parent:
@@ -295,7 +300,6 @@ class MainWindow(QMainWindow):
 
     def _refresh_tree(self):
         self.tree.clear()
-
         if not self.building:
             return
 
@@ -321,7 +325,6 @@ class MainWindow(QMainWindow):
 
             apt_item.setExpanded(True)
 
-        # Итоги
         if self.building.apartments:
             self.result_label.setText(
                 f"Общая площадь: {self.building.total_area():.2f} кв.м    |    "
@@ -329,6 +332,48 @@ class MainWindow(QMainWindow):
             )
         else:
             self.result_label.setText("Нет данных для расчёта")
+
+    def _show_help(self):
+        """Показывает окно справки с руководством пользователя."""
+        help_text = (
+            "<h2>Руководство пользователя</h2>"
+            "<p><b>Калькулятор помещений (MVP)</b> — приложение для расчёта "
+            "площади и тепловой мощности здания.</p>"
+
+            "<h3>Порядок работы:</h3>"
+            "<ol>"
+            "<li><b>Задать здание:</b> при запуске введите название здания "
+            "(или нажмите «Изменить название» в любой момент).</li>"
+            "<li><b>Добавить квартиру:</b> нажмите кнопку « Добавить квартиру» "
+            "и введите её номер или название.</li>"
+            "<li><b>Добавить комнату:</b> выберите нужную квартиру в дереве слева, "
+            "нажмите « Добавить комнату» и заполните форму.</li>"
+            "<li><b>Ввод размеров:</b> в полях «Длина», «Ширина», «Высота» "
+            "указываются только положительные числа (в метрах). "
+            "При некорректном вводе под полем появляется красная подсказка.</li>"
+            "<li><b>Утепление:</b> выберите уровень (низкий/средний/высокий). "
+            "Он влияет на расчёт тепловой мощности.</li>"
+            "<li><b>Удаление:</b> выберите объект в дереве и нажмите « Удалить выбранное».</li>"
+            "<li><b>Сохранение:</b> нажмите « Сохранить отчёт в Word» — "
+            "будет создан файл <code>report.docx</code>.</li>"
+            "</ol>"
+
+            "<h3>Формулы расчёта:</h3>"
+            "<ul>"
+            "<li>Площадь комнаты: <b>Длина × Ширина</b></li>"
+            "<li>Тепловая мощность (базовая): <b>Площадь / 10</b> кВт</li>"
+            "<li>Коэффициенты утепления: низкий ×1.5, средний ×1.0, высокий ×0.8</li>"
+            "</ul>"
+
+            "<p><i>Совет: для точных расчётов используйте реальные размеры помещений.</i></p>"
+        )
+
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Справка")
+        msg.setTextFormat(Qt.RichText)
+        msg.setText(help_text)
+        msg.setIcon(QMessageBox.Information)
+        msg.exec()
 
     def _save_report(self):
         if not self.building or not self.building.apartments:
@@ -339,6 +384,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Успех", "Отчёт сохранён в файл report.docx")
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить отчёт: {e}")
+
 
 def main():
     app = QApplication(sys.argv)
